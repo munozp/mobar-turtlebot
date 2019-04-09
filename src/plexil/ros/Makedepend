@@ -1,0 +1,31 @@
+nodo_comunicacion_clnt.o: nodo_comunicacion_clnt.c \
+ /home/pablich/Desktop/mobar-turtle/src/ros/src/nodo_comunicacion/src/nodo_comunicacion.h
+nodo_comunicacion_xdr.o: nodo_comunicacion_xdr.c \
+ /home/pablich/Desktop/mobar-turtle/src/ros/src/nodo_comunicacion/src/nodo_comunicacion.h
+TurtlecomAdapter.o: TurtlecomAdapter.cc TurtlecomAdapter.hh \
+ /opt/plexil/src/app-framework/InterfaceAdapter.hh \
+ /opt/plexil/src/exec/ExecDefs.hh /opt/plexil/src/utils/Id.hh \
+ /opt/plexil/src/utils/IdTable.hh \
+ /opt/plexil/src/utils/generic_hash_map.hh \
+ /opt/plexil/src/utils/ThreadMutex.hh /opt/plexil/src/utils/Error.hh \
+ /opt/plexil/src/utils/generic_hash_map.hh \
+ /opt/plexil/third-party/pugixml/src/pugixml.hpp \
+ /opt/plexil/third-party/pugixml/src/pugiconfig.hpp \
+ /opt/plexil/src/utils/LabelStr.hh \
+ /opt/plexil/src/utils/ConstantMacros.hh \
+ /opt/plexil/src/utils/StoredItem.hh \
+ /opt/plexil/src/utils/StoredItem_TR1.hh \
+ /opt/plexil/src/utils/KeySource.hh \
+ /opt/plexil/src/app-framework/AdapterFactory.hh \
+ /opt/plexil/src/exec/CoreExpressions.hh \
+ /opt/plexil/src/exec/Calculable.hh /opt/plexil/src/exec/Expression.hh \
+ /opt/plexil/src/exec/ExecDefs.hh /opt/plexil/src/exec/PlexilPlan.hh \
+ /opt/plexil/src/exec/PlexilResource.hh /opt/plexil/src/utils/Utils.hh \
+ /opt/plexil/src/utils/Id.hh /opt/plexil/src/exec/Variable.hh \
+ /opt/plexil/src/app-framework/AdapterExecInterface.hh \
+ /opt/plexil/src/utils/ParserException.hh \
+ /opt/plexil/src/exec/Expression.hh /opt/plexil/src/utils/Debug.hh \
+ /home/pablich/Desktop/mobar-turtle/src/ros/src/nodo_comunicacion/src/nodo_comunicacion.h \
+ /opt/plexil/src/exec/BooleanVariable.hh \
+ /opt/plexil/src/utils/ConstantMacros.hh /opt/plexil/src/exec/Node.hh \
+ /opt/plexil/src/exec/NodeConnector.hh /opt/plexil/src/utils/stricmp.h

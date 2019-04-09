@@ -1,0 +1,2 @@
+autodock:nodo_comunicacion:teleop
+-DCATKIN_DEVEL_PREFIX=/home/gsi/Escritorio/mobar/src/ros/devel -DCMAKE_INSTALL_PREFIX=/home/gsi/Escritorio/mobar/src/ros/install -G Unix Makefiles

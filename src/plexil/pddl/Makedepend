@@ -1,0 +1,31 @@
+CDominio.o: CDominio.cpp CDominio.h CPDDLstruct.h
+CProblema.o: CProblema.cpp CProblema.h CPDDLstruct.h
+CPlan.o: CPlan.cpp CPlan.h CPDDLstruct.h CDominio.h
+Planner.o: Planner.cpp Planner.h CPDDLstruct.h CProblema.h CPlan.h \
+ CDominio.h
+PDDLAdapter.o: PDDLAdapter.cpp PDDLAdapter.h \
+ /opt/plexil/src/app-framework/InterfaceAdapter.hh \
+ /opt/plexil/src/exec/ExecDefs.hh /opt/plexil/src/utils/Id.hh \
+ /opt/plexil/src/utils/IdTable.hh \
+ /opt/plexil/src/utils/generic_hash_map.hh \
+ /opt/plexil/src/utils/ThreadMutex.hh /opt/plexil/src/utils/Error.hh \
+ /opt/plexil/src/utils/generic_hash_map.hh \
+ /opt/plexil/third-party/pugixml/src/pugixml.hpp \
+ /opt/plexil/third-party/pugixml/src/pugiconfig.hpp \
+ /opt/plexil/src/utils/LabelStr.hh \
+ /opt/plexil/src/utils/ConstantMacros.hh \
+ /opt/plexil/src/utils/StoredItem.hh \
+ /opt/plexil/src/utils/StoredItem_TR1.hh \
+ /opt/plexil/src/utils/KeySource.hh \
+ /opt/plexil/src/app-framework/AdapterFactory.hh \
+ /opt/plexil/src/exec/CoreExpressions.hh \
+ /opt/plexil/src/exec/Calculable.hh /opt/plexil/src/exec/Expression.hh \
+ /opt/plexil/src/exec/ExecDefs.hh /opt/plexil/src/exec/PlexilPlan.hh \
+ /opt/plexil/src/exec/PlexilResource.hh /opt/plexil/src/utils/Utils.hh \
+ /opt/plexil/src/utils/Id.hh /opt/plexil/src/exec/Variable.hh \
+ /opt/plexil/src/app-framework/AdapterExecInterface.hh \
+ /opt/plexil/src/utils/ParserException.hh \
+ /opt/plexil/src/exec/Expression.hh /opt/plexil/src/utils/Debug.hh \
+ /opt/plexil/src/exec/BooleanVariable.hh \
+ /opt/plexil/src/utils/ConstantMacros.hh Planner.h CPDDLstruct.h \
+ CProblema.h CPlan.h CDominio.h

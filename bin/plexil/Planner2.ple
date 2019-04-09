@@ -1,0 +1,401 @@
+/**
+* Planner.ple
+* Pablo Munoz, 22 Mayo de 2015
+*/
+// Commands for PDDL planner
+Boolean Command connect_planner_to_ogate(String name, String host, Integer port);
+Boolean Command send_planner_metrics(Integer numplanner, Integer tick);
+Integer Command create_planner(String configfile);
+Boolean Command get_plan(Integer numplanner, Boolean replan);
+String  Command next_action(Integer numplanner);
+Boolean	Command insert_predicate(Integer numplanner, String predicate, String objects, Boolean isgoal);
+Boolean Command modify_predicate(Integer numplanner, String predicate, String objectsold, String objectsnew);
+Boolean Command remove_predicate(Integer numplanner, String predicate, String objects);
+Boolean Command modify_function(Integer numplanner, String predicate, String objects, Real value);
+String 	Command predicate_object(Integer numplanner, String predicate, Integer numobject);
+String 	Command action_object(Integer numplanner, Integer numobject);
+Real	Command function_value(Integer numplanner, String predicate, String objects);
+Real	Command action_duration(Integer numplanner);
+
+// Locomotion module
+Boolean	Command init_locomotion (Real squaresize);
+Boolean	Command set_position (String square, String orientation, Real altitude);
+Boolean	Command set_lineal_speed (Real linspeed);
+Boolean	Command set_lineal_speed_m (String speedmode);
+Boolean	Command set_angular_speed (Real angspeed);
+Boolean	Command set_angular_speed_m (String speedmode);
+Real	Command forward (String square);
+Real	Command rotate (String orientation);
+Real	Command diagonal (String square);
+Real    Command move (Integer tick, Real x, Real y);
+Real  Command move_to (String position);
+Real    Command rotate_to (String orientation);
+Boolean	Command switch_off_locomotion ();
+//Cameras module
+Boolean	Command init_cameras ();
+String	Command get_last_image (String cam);
+Boolean Command switch_on_cam (String cam);
+Boolean Command switch_off_cam (String cam);
+Boolean	Command acquire_image (String cam, String mode);
+Boolean Command acquire_wac_panorama ();
+Boolean	Command switch_off_cameras ();
+//Mast module
+Boolean	Command init_mast ();
+Boolean Command move_ptu (String ptu);
+Boolean	Command move_mast (Real j1, Real j2, Real j3, Real j4, Real j5);
+Boolean Command undo_move ();
+Boolean Command deploy ();
+Boolean Command fold ();
+Boolean	Command switch_off_mast ();
+//Communications module
+Boolean Command init_communications ();
+Boolean Command communicate (String picture);
+Boolean Command switch_off_communications ();
+Boolean Command tm_communication_status (Integer tick, String status);
+//TickTime commands
+Boolean Command connect_timer_to_ogate (String name, String host, Integer port);
+Boolean Command send_metric_to_ogate (String metric, Real value);
+Boolean Command start_timer (Integer numtimer);
+Real    Command stop_timer (Integer numtimer);
+
+// Main planner, (re)planning process and read and execute commands.
+Planner:
+{
+    String sp = "~";
+    // OGATE Server
+    String host = "127.0.0.1";
+    Integer port = 40404;
+	// Planner variables
+    String plannerconfig = "OGATE_INSTANCE_DIRconfigDalaOgate";
+	Integer numplanner;
+	Boolean replanificar = false;
+	// Init states and rover model
+	String initposition;
+	String initptupos;
+	String rovername = "dala";
+	String timeplan = "time_point";
+	Real timepoint = 0;
+	Real initactiontick = 0;
+	// Actions definitions (from PDDL config file)
+	String moveto   = "moveto";
+	String picture  = "picture";
+	String sendimg  = "sendpic";
+	String moveptu  = "moveptu";
+	String wait     = "wait";
+	String finished = "FINAL_PLAN";
+	// Position of relevant objects in actions plan
+    Integer origmove = 2;
+	Integer destmove = 3;
+	Integer destptu  = 3;
+	Integer picid    = 4;
+	// Predicates and functions names (from PDDL model)
+	String position    = "position";
+	String pantilt     = "ptu_pos";
+	String imagegoal   = "transmited";
+	String imagesub    = "takepicture";
+	// Replanning action (for TC)
+	String tcreplan = "REPLAN";
+
+    ConnectTimerToOgate:
+    {
+        Boolean ok;
+        EndCondition isKnown(ok);
+        PostCondition ok;
+        ok = connect_timer_to_ogate("PlexilExec", host, port);
+    }
+    
+    CreatePlanner:
+	{
+		EndCondition isKnown(numplanner);
+		PostCondition numplanner >= 0;
+		numplanner = create_planner(plannerconfig);
+	}
+	ConnectPlannerToOgate:
+	{
+    	Boolean ok;
+        EndCondition isKnown(ok);
+        PostCondition ok;
+        ok = connect_planner_to_ogate("PlexilExec.planner", host, port);
+	}
+	
+	GetInitialState:
+	{
+	    PreCondition CreatePlanner.outcome == SUCCESS;
+	    Sequence
+	    {
+		    GetPosition:
+		    {
+			    EndCondition isKnown(initposition);
+			    initposition = predicate_object(numplanner, position, 2);
+		    }
+	        GetPtuPos:
+	        {
+	            EndCondition isKnown(initptupos);
+	            initptupos = predicate_object(numplanner, pantilt, 2);
+	        }
+            SendInitialPlannerMetricsToOgate:
+            {
+                Boolean ok;
+	            EndCondition isKnown(ok);
+	            PostCondition ok;
+                ok = send_planner_metrics(numplanner, 0);
+            }
+        }
+    }
+
+    InitRover:
+    Sequence
+    {
+        InitComunication:
+        {
+            Boolean ok;
+            EndCondition isKnown(ok);
+            PostCondition ok;
+            ok = init_communications();            
+        }
+        InitLocomotion:
+        {
+            Boolean ok;
+            EndCondition isKnown(ok);
+            PostCondition ok;
+            ok = init_locomotion(1);
+        }
+        InitPtu:
+        {
+            Boolean ok;
+            EndCondition isKnown(ok);
+            PostCondition ok;
+            ok = init_mast();
+        }
+        InitCameras:
+        {
+            Boolean ok;
+            EndCondition isKnown(ok);
+            PostCondition ok;
+            ok = init_cameras();
+        }
+    }
+
+	MainPlannerExecution:
+	{
+		StartCondition GetInitialState.state == FINISHED;
+		SkipCondition GetInitialState.outcome != SUCCESS;
+	    	
+		// Main execution flow
+		ExecutePlan:
+	    {
+ 	        String nomaccion = "";
+ 	        String object;
+ 	        String objold, objnew;
+ 	        String cpos, cptu, cimg;
+ 	        Boolean planok = false;
+	        Real duration;
+ 	    	PostCondition nomaccion == finished;
+		
+	    	while(nomaccion != finished)
+	    	{
+    		    Main:
+    		    Sequence
+    		    {
+	       		    Planning:
+        		    {
+        		        SkipCondition planok;
+	            		EndCondition isKnown(planok);
+	            		PostCondition planok;
+	            		planok = get_plan(numplanner, replanificar);
+	            	}
+        		    VarNoReplanificar:
+	              	{
+	              	    SkipCondition planok;
+	            		StartCondition Planning.state == FINISHED;
+	            	    replanificar = !planok;
+	        	    }
+    		        ReadNextAction:
+    			    {
+    		            SkipCondition !planok;
+        			    EndCondition isKnown(nomaccion);
+        			    nomaccion = next_action(numplanner);
+        		    }
+			        SetPlanFlag:
+			        {
+			            planok = nomaccion != tcreplan;
+			        }
+        		    GetActionTime:
+        		    {
+    		            SkipCondition !planok;
+        		        EndCondition isKnown(duration);
+        		        duration = action_duration(numplanner);
+    		        }
+    			    UpdateTime:
+		            {
+    		            SkipCondition !planok;
+			            timepoint = timepoint + duration;
+		            }
+    		        ExecuteAction:
+    		        {
+    		            StartCondition planok;
+    		            SkipCondition !planok;
+    		            initactiontick = Lookup(tick);
+    		            if(nomaccion == moveto)
+    		            Sequence
+    		            {
+		                    GetDest:
+		                    {
+		                        cpos = action_object(numplanner, destmove);
+		                    }
+		                    MoveTo:
+		                    {
+		                        Real ret;
+		                        EndCondition isKnown(ret);
+		                        PostCondition ret > 0;
+		                        ret = move_to(cpos);
+		                    }
+		                    GetOriginPosition:
+		                    {
+		                        object = action_object(numplanner, origmove);
+		                    }
+		                    SetOldPositionObj:
+		                    {
+		                        objold = rovername+sp+object;
+	                        }
+		                    SetNewPositionObj:
+	                        {
+	                            objnew = rovername+sp+cpos;
+	                        }
+		                    UpdatePosition:
+		                    {
+		                        Boolean ok;
+		                        StartCondition MoveTo.outcome == SUCCESS;
+		                        SkipCondition MoveTo.outcome != SUCCESS;
+		                        EndCondition isKnown(ok);
+		                        PostCondition ok;
+		                        ok = modify_predicate(numplanner, position, objold, objnew);
+	                        }
+    		            }
+    		            elseif(nomaccion == moveptu)
+    		            Sequence
+    		            {
+		                    GetPointing:
+		                    {
+		                        cptu = action_object(numplanner, destptu);
+		                    }
+		                    MovePtu:
+		                    {
+		                        Boolean ret;
+		                        EndCondition isKnown(ret);
+		                        PostCondition ret;
+		                        ret = move_ptu(cptu);
+		                    }
+		                    GetPrevPtu:
+		                    {
+		                        object = action_object(numplanner, origmove);
+		                    }
+		                    SetOldPtuObj:
+		                    {
+		                        objold = rovername+sp+object;
+	                        }
+		                    SetNewPtuObj:
+	                        {
+	                            objnew = rovername+sp+cptu;
+	                        }
+		                    UpdatePtuPointing:
+		                    {
+		                        Boolean ok;
+		                        StartCondition MovePtu.outcome == SUCCESS;
+		                        SkipCondition MovePtu.outcome != SUCCESS;
+		                        EndCondition isKnown(ok);
+		                        PostCondition ok;
+		                        ok = modify_predicate(numplanner, pantilt, objold, objnew);
+	                        }
+    		            }
+    		            elseif(nomaccion == picture)
+    		            {
+    		                TakePicture:
+    		                {
+    		                    Boolean ok;
+    		                    EndCondition isKnown(ok);
+    		                    PostCondition ok;
+    		                    ok = acquire_image("wac-l", "RRGB");
+    		                }
+    		                GetImgId:
+    		                {
+    		                    cimg = action_object(numplanner, picid);
+		                    }
+		                    SetPictureObj:
+		                    {
+		                        objnew = rovername+sp+cpos+sp+cptu+sp+cimg;
+	                        }
+	                        IncludePictureAchieved:
+	                        {
+	                            Boolean ok;
+	                            EndCondition isKnown(ok);
+                                PostCondition ok;
+                                ok = insert_predicate(numplanner, imagesub, objnew, false);
+	                        }
+    		            }
+    		            elseif(nomaccion == sendimg)
+    		            {
+		                    GetPictureId:
+		                    {
+		                        object = action_object(numplanner, picid);
+		                    }
+    		                CommunicatePicture:
+    		                {
+    		                    Boolean ok;
+    		                    EndCondition isKnown(ok);
+    		                    PostCondition ok;
+    		                    ok = communicate(object);
+    		                }
+    		                GetImgPtuPos:
+    		                {
+    		                    object = action_object(numplanner, destptu);
+		                    }
+    		                GetImgTxId:
+    		                {
+    		                    cimg = action_object(numplanner, picid);
+		                    }
+		                    SetTransmitedObj:
+		                    {
+		                        objnew = rovername+sp+cpos+sp+object+sp+cimg;
+	                        }
+	                        IncludeTransmitedAchieved:
+	                        {
+	                            Boolean ok;
+	                            EndCondition isKnown(ok);
+                                PostCondition ok;
+                                ok = insert_predicate(numplanner, imagegoal, objnew, false);
+	                        }
+    		            }
+    		            elseif(nomaccion == wait)
+    		            {
+    		                DoNothing:
+    		                {
+    		                    Wait duration;
+    		                }
+    		            }
+    		            endif
+	                }
+                    SendPlannerMetricsToOgate:
+                    {
+                        Boolean ok;
+                        EndCondition isKnown(ok);
+                        PostCondition ok;
+                        ok = send_planner_metrics(numplanner, initactiontick);
+                    }
+    				CheckActionResult:
+			        {
+			        	PostCondition !replanificar;
+			        	replanificar = ExecuteAction.outcome == FAILURE || nomaccion == tcreplan;
+			        }
+    				SetStartTime:
+    				{
+        				StartCondition replanificar;
+        				SkipCondition !replanificar;
+        				modify_function(numplanner, timeplan, "", timepoint);
+        			}
+                } // sequence
+    		} // while
+		} // ExecutePlan
+	} // Main planner execution
+
+} // root

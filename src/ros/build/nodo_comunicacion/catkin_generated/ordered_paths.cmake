@@ -1,0 +1,1 @@
+set(ORDERED_PATHS "/home/gsi/kobuki/devel/lib;/opt/ros/indigo/lib")

@@ -1,0 +1,58 @@
+<Interfaces>	
+    <Adapter AdapterType="TickTimeAdapter">
+		<CommandNames>
+		connect_timer_to_ogate,
+		send_metric_to_ogate,
+		start_timer,
+    		stop_timer,
+		</CommandNames>
+		<LookupNames>
+		time,
+		tick,
+		</LookupNames>
+ 	</Adapter>
+	<Adapter AdapterType="TurtlecomAdapter">
+		<CommandNames>
+		init_locomotion,
+		moveto,
+		forward,
+		rotate,
+		bumpersensor,
+		readBateryLevel,
+		checkCharging,
+		autodocking,
+		takePicture,
+		checkPosition,
+		checkAngle,
+		moveBack,
+        moveBackxMeters,
+        restartDockServer,
+        stopAction,
+		</CommandNames>
+	</Adapter>
+	<Adapter AdapterType="ArduinoAdapter">
+		<CommandNames>
+		movePtu,
+		initPtu,
+		</CommandNames>
+	</Adapter>
+	<Adapter AdapterType="PDDLAdapter">
+		<CommandNames>
+		connect_planner_to_ogate,
+		create_planner,
+		get_plan,
+		next_action,
+		insert_predicate,
+		modify_predicate,
+		remove_predicate,
+		predicate_object,
+		modify_function,
+		function_value,
+		action_object,
+		action_duration,
+        putObstacle,
+        delete_goals,
+		</CommandNames>
+	</Adapter>
+
+</Interfaces>

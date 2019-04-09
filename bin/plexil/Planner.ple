@@ -1,0 +1,559 @@
+/**
+* Planner.ple
+* Pablo Munoz, 22 Mayo de 2015
+*/
+// Commands for PDDL planner
+Boolean Command connect_planner_to_ogate(String name, String host, Integer port);
+Integer Command create_planner(String configfile);
+Boolean Command get_plan(Integer numplanner, Boolean replan);
+String  Command next_action(Integer numplanner);
+Boolean	Command insert_predicate(Integer numplanner, String predicate, String objects, Boolean isgoal);
+Boolean Command modify_predicate(Integer numplanner, String predicate, String objectsold, String objectsnew);
+Boolean Command remove_predicate(Integer numplanner, String predicate, String objects);
+Boolean Command modify_function(Integer numplanner, String predicate, String objects, Real value);
+String 	Command predicate_object(Integer numplanner, String predicate, Integer numobject);
+String 	Command action_object(Integer numplanner, Integer numobject);
+Real	Command function_value(Integer numplanner, String predicate, String objects);
+Real	Command action_duration(Integer numplanner);
+Boolean Command putObstacle (String position, String angle, Integer downbumper);
+Boolean Command delete_goals();
+//TickTime commands
+Boolean Command connect_timer_to_ogate (String name, String host, Integer port);
+Boolean Command send_metric_to_ogate (String metric, Real value);
+Boolean Command start_timer (Integer numtimer);
+Real    Command stop_timer (Integer numtimer);
+Real    Lookup time;
+Real    Lookup tick;
+// Commands for ROS. 
+        Command init_locomotion(String host, Integer sqsize, Integer offsetx, Integer offsety);
+String  Command moveto(String pos);
+String  Command rotate(String ang);
+String  Command movePtu(String yaw_pitch);
+Boolean Command checkCharging();
+Real    Command readBateryLevel();
+Integer Command autodocking();
+Boolean Command takePicture();
+String  Command checkPosition();
+String  Command checkAngle();
+String  Command moveBack(Integer dismov);
+Integer Command bumpersensor();
+        Command initPtu(String host);
+String  Command moveBackxMeters(String Orientation, String Robotsquare);
+Boolean Command restartDockServer();
+//Boolean Command putObstacle (String position);
+Boolean Command stopAction(String action);
+
+/***********************Library Nodes****************************/
+LibraryAction dock(In Integer numplanner,InOut Boolean stop_dock, InOut Boolean dock_finished_ok);
+LibraryAction undock(In Integer numplanner, InOut Boolean undockOk);
+LibraryAction timer(In Real Timer, InOut Boolean stop_timer, InOut Boolean timer_finished_ok);
+
+// Main planner, (re)planning process and read and execute commands.
+Planner:
+{
+    String sp = "~";
+	// OGATE Server
+	String host_ogate = "127.0.0.1";
+	Integer port = 40404;
+	// Planner variables
+    //String plannerconfig = "OGATE_INSTANCE_DIRconfigOgate";
+	String plannerconfig = "OGATE_INSTANCE_DIRCONFIG_PLANNER";
+    //String plannerconfig = "../planner/configNoOgateSGP";
+	Integer numplanner;
+	Boolean replanificar = false;
+	// Init states and rover model
+	String initposition;
+	String initorientation;
+	Real   initenergy;
+	Real   squaresize;
+	String rovername   = "turtle";
+	String  timeplan   = "time_point";
+	String  camera     = "kinect";
+	String resolution  = "highRes";
+	Real timepoint = 0;
+   	String cam = "navcam";
+	// Actions definitions (from PDDL config file)
+	String charge   = "charge";
+	String rotate   = "rotate";
+	String moveto   = "moveto";
+	String modspeed = "changespeed";
+	String picture  = "picture";
+	String moveptu  = "moveptu";
+	String ptu_pos	= "ptu_pos";
+    String free     = "free";
+	String finished = "FINAL_PLAN";
+	// Position of relevant objects in actions plan
+	Integer origmove = 2;
+	Integer destmove = 3;
+	Integer destrot  = 3;
+	Integer origptu  = 3;
+	Integer destptu  = 4;
+	Integer positionpicture =1;
+	// Predicates and functions names (from PDDL model)
+	String position    = "position";
+	String orientation = "orientation";
+	String energy      = "energy";
+	String energycons  = "energy_cons";
+	String square      = "square_size";
+	String imagesub    = "picture";
+	String dock        = "dock";
+	String undock      = "undock";
+	String is_charging  = "is_charging";
+	// Replanning action (for TC)
+	String tcreplan = "REPLAN";
+	// Host direcction
+	String host	  ="IP_TURTLE";
+	Real initactiontick =-1;
+	Integer Cx=17;//3
+	Integer Cy=13;//11
+    //Distance to Move back 
+    Integer movebackundock=40;
+    Integer movebackdocktimeout=25;
+    Integer autodockmaxtime=60; //60 secons to do autodock;
+
+	ConnectTimerToOgate:
+	{
+	  Boolean ok;
+	  EndCondition isKnown(ok);
+	  PostCondition ok;
+	  ok = connect_timer_to_ogate("PlexilExec", host_ogate, port);
+	}
+
+	CreatePlanner:
+	{
+		EndCondition isKnown(numplanner);
+		PostCondition numplanner >= 0;
+		numplanner = create_planner(plannerconfig);
+	}
+	ConnectPlannerToOgate:
+	{
+	    	Boolean ok;
+		EndCondition isKnown(ok);
+		PostCondition ok;
+		ok = connect_planner_to_ogate("PlexilExec.planner", host_ogate, port);
+	}
+
+
+	GetInitialState:
+	{
+	    PreCondition CreatePlanner.outcome == SUCCESS;
+	    Sequence
+	    {
+		    GetPosition:
+		    {
+			    EndCondition isKnown(initposition);
+			    initposition = predicate_object(numplanner,position,2);
+		    }
+		    GetEnergy:
+		    {
+			    EndCondition isKnown(initenergy);
+			    initenergy = function_value(numplanner, energy, rovername);
+		    }
+		    GetSquareSize:
+		    {
+		        EndCondition isKnown(squaresize);
+		        squaresize = function_value(numplanner, square, "");
+                    }
+		    GetOrientation:
+		    {
+			EndCondition isKnown(squaresize);
+			initorientation = predicate_object(numplanner, orientation,2);
+		    }
+	        	
+		    SetSquareSize:
+		    {
+			SkipCondition GetSquareSize.outcome != SUCCESS;
+			init_locomotion(host,40,Cx,Cy);
+		    }
+		    InitArduinoServer:
+		    {
+			initPtu(host);
+		    }
+            }
+   	 }	
+
+	GetTurtlestate:
+	Sequence
+	{
+		String box_init;
+		String angle_init;
+		String objold;
+		String objnew;
+		GetTurtlePosition:
+		{
+			 box_init=checkPosition();
+		}
+		GetTurtleBatery:
+		{
+			//Nodo vacío a la espera de poder cuadrar los niveles de batería del robot con los de PDDL.
+		}
+		GetTurtleOrientation:
+		{
+			angle_init=checkAngle();
+		}
+		SetPositionObjOld:
+		{
+			objold = "turtle "+initposition;
+		}
+		SetPositionObjNew:
+		{
+			objnew = "turtle "+box_init;
+		}
+		UpdatePositionPlanner:
+		{
+		Boolean update_data;
+		PostCondition update_data==true;
+		update_data=modify_predicate(numplanner, "position", objold, objnew);
+		}
+		SetOrientObjOld:
+		{
+			objold = "turtle "+initorientation;
+		}
+		SetOrientObjNew:
+		{
+			objnew = "turtle "+angle_init;
+		}
+		/*UpdateAnglePosition:
+		{
+		Boolean update_data;
+		PostCondition update_data==true;
+		update_data=modify_predicate(numplanner, "orientation", objold, objnew);
+		}*/	
+	}
+			
+	MainPlannerExecution:
+	{
+		StartCondition GetInitialState.state == FINISHED;
+		SkipCondition GetInitialState.outcome != SUCCESS;
+		Sequence
+		{
+	    	
+    		// Main execution flow
+		ExecutePlan:
+		{
+ 	        String nomaccion ="";
+ 	        String object, object_dest;
+ 	        String objold, objnew;
+		    String cpos, cptu, cimg;
+		    Real duration;
+		    Boolean planok = false;
+            Integer flag_planificacion=0;
+ 	    	PostCondition nomaccion == finished;
+		
+    	    	while(nomaccion != finished)
+    	    	{
+        		    Main:
+        		    Sequence
+        		    {
+				    Planning:
+		    	    {
+                        PostCondition planok;
+                        Plan:
+                        {
+    		        	SkipCondition planok;
+            			EndCondition isKnown(planok);
+            			//PostCondition planok;
+            			planok = get_plan(numplanner, replanificar);
+                        }
+                        // if no solution rescheduled twice, go charging point.
+                        ResetFlag:
+                        {
+                            SkipCondition !planok;
+                            flag_planificacion=0;
+                        }
+                        SetFlag:
+                        {
+                            SkipCondition planok;
+                            flag_planificacion=flag_planificacion+1;
+                        }
+                        GoBacktoDock:
+                        {   
+                            SkipCondition flag_planificacion!=2;
+                            Sequence
+                            {
+                                DeletePreviusGoals:
+                                {
+                                    Boolean ok;
+                                    //EndCondition isKnown(ok);
+                                    //PostCondition ok;
+                                    ok=delete_goals();
+                                }
+                                SetNewGoals:
+                                {
+                                   Boolean ok;
+                                   EndCondition isKnown(ok);
+                                   PostCondition ok;
+                                   ok=insert_predicate(numplanner,is_charging, rovername, true);
+                                }
+                                Plan:
+                                {
+                                    StartCondition SetNewGoals.outcome==SUCCESS;
+                                    planok=false;
+                                }
+                            }
+                        
+            		    }
+                    }
+    		    	VarNoReplanificar:
+              		{
+          	    		SkipCondition planok;
+            			StartCondition Planning.state == FINISHED;
+        	    		replanificar = !planok;
+        	    	}
+    		        ReadNextAction:
+    			    {
+			            SkipCondition !planok;
+        			    EndCondition isKnown(nomaccion);
+        			    nomaccion = next_action(numplanner);
+        		    }
+				    SetPlanFlag:
+			        {
+			            planok = nomaccion != tcreplan;
+			        }
+	        		GetActionTime:
+	        		{
+					    SkipCondition !planok;
+	        		    EndCondition isKnown(duration);
+	        		    duration = action_duration(numplanner);
+    		        }
+        			UpdateTime:
+			        {
+					    SkipCondition !planok;
+				        timepoint = timepoint + duration;
+			        }
+    		        ExecuteAction:
+    		        {
+			            StartCondition planok;
+		            	SkipCondition !planok;
+			            initactiontick = -1;
+    		            if(nomaccion == moveto)
+    		            Sequence
+    		            {
+	                        GetDest:
+	                        {
+	                            object_dest = action_object(numplanner, destmove);
+	                        }
+	                        MoveTo:
+	                        {
+	                            //PostCondition cpos == object;
+			                    cpos= moveto(object_dest);
+
+	                        }
+		                    GetOriginPosition:
+                    	     {
+                        	    object = action_object(numplanner, origmove);
+                             }
+                   	        SetOldPositionObj:
+                   	        {
+                       	    	 objold = rovername+sp+object;
+		                     }
+	                        SetNewPositionObj:
+		                    {
+		                        objnew = rovername+sp+cpos;
+		                    }
+		                    UpdatePosition:
+		                    {
+			                    Boolean ok;
+			                    //StartCondition MoveTo.outcome == SUCCESS;
+		                        //SkipCondition MoveTo.outcome != SUCCESS;
+		                        EndCondition isKnown(ok);
+			                    PostCondition ok == true;
+			                   ok = modify_predicate(numplanner, position, objold, objnew);
+		                    }
+		                    CheckOk:
+		                    {
+                            String angle;
+                            Integer bumper;
+			                PostCondition cpos == object_dest;
+			                if (cpos != object_dest)
+			                {
+                                GetOrientation:
+                                {
+                                    angle=checkAngle();
+                                }
+                                GetBumper:
+                                {
+                                    bumper=bumpersensor();
+                                }
+                                AddObstacle:
+                                {
+                                    Boolean ok;
+                                    //PostCondition ok == true;
+                                    ok=putObstacle(cpos, angle, bumper);
+
+                                }
+                                MoveBackTurle:
+		                        {
+                                    String pos;
+                                    pos=cpos;
+		          	                cpos= moveBackxMeters(angle,pos);
+		                        }
+                                //Actualizar la posicion una vez que el robot ha retrocedido para sortear el obstaculo.
+                                SetOldPositionObj:
+                           	     {
+                               	    	 objold =predicate_object(numplanner,position,1);
+		                         }
+	                            SetNewPositionObj:
+		                        {
+		                                objnew = rovername+sp+cpos;
+		                        }
+		                        UpdatePosition:
+		                        {
+			                      Boolean ok;
+		                          EndCondition isKnown(ok);
+			                      PostCondition ok == true;
+			                      ok = modify_predicate(numplanner, position, objold, objnew);
+		                        }
+                                Replan:
+                                {
+                                planok=false;
+				                replanificar = CheckOk.outcome == FAILURE;
+                                }
+				
+			                }
+			                endif
+		                    }	
+		        
+	                    }
+		                elseif(nomaccion == rotate)//RepeatCondition DockStatus==-1 && Autodock.outcome==FAILURE;
+                	    Sequence
+		                {
+                        	GetOrientation:
+	                        {
+	                            object = action_object(numplanner, destrot);
+	                        }
+	                        RotateTo:
+	                        {
+	                            String ret;
+	                            EndCondition isKnown(ret);
+			                    PostCondition ret !=object;
+			                    ret=rotate(object);
+	                        }
+		                }
+		                elseif(nomaccion == moveptu)
+		                Sequence
+		                {
+		                    GetPointing:
+		                    {
+		                        cptu= action_object(numplanner, destptu);
+		                    }
+		                    MovePtu:
+		                    {
+		                        String ret;
+		                        EndCondition isKnown(ret);
+		                        PostCondition ret==cptu;
+			                    ret= movePtu(cptu);
+		                    }
+		                    GetPrevPtu:
+                        	{
+                                object = action_object(numplanner,origptu);
+                        	}
+                        	SetOldPtuObj:
+                        	{
+                                objold = rovername+sp+camera+sp+object;
+                        	}
+                        	SetNewPtuObj:
+                        	{
+                            	    objnew = rovername+sp+camera+sp+cptu;
+                       		}
+                       	    UpdatePtuPointing:
+                        	{
+		                        Boolean ok;
+		                        StartCondition MovePtu.outcome == SUCCESS;
+		                        SkipCondition MovePtu.outcome != SUCCESS;
+		                        EndCondition isKnown(ok);
+		                        PostCondition ok == true;
+		                        ok = modify_predicate(numplanner,ptu_pos, objold, objnew);
+                        	}
+		                }
+		                elseif(nomaccion == picture)
+		                Sequence
+		                {
+	                        String object2;
+		                    TakePicture:
+		                    {
+		                        Boolean ok;
+		                        PostCondition ok==true;
+		                        ok = takePicture();
+		                    }
+			                GetPrevPicture:
+			                {
+				                object=action_object(numplanner,origmove);
+				                object2=action_object(numplanner,destptu);
+			                }
+			                SetNewPicture:
+			                {
+				                objnew=object+sp+rovername+sp+resolution+sp+object2;
+			                }
+			                UpdatePicture:
+			                {
+				                Boolean ok;
+		                        StartCondition TakePicture.outcome == SUCCESS;
+                                SkipCondition TakePicture.outcome != SUCCESS;
+		                        EndCondition isKnown(ok);
+				                PostCondition ok == true;
+				                ok=insert_predicate(numplanner,picture,objnew,false);
+			                }
+
+		                }
+		                elseif(nomaccion == dock)
+		                {
+                            Boolean dock_finished_ok;
+                            Boolean timer_finished_ok;
+                            Concurrence
+                            {
+                                LibraryCall timer(Timer=autodockmaxtime, stop_timer=dock_finished_ok, timer_finished_ok=timer_finished_ok);
+                                LibraryCall dock(numplanner=numplanner, stop_dock=timer_finished_ok , dock_finished_ok=dock_finished_ok);
+                            }
+                            DockTimeOut:
+                            {
+                                Boolean ok;
+                                StartCondition timer_finished_ok==true;
+                                SkipCondition dock_finished_ok==true;
+                                ok=stopAction("dock");
+                            }
+		                }
+		                elseif(nomaccion == undock)
+		                {
+                            Boolean ok=false;
+                            Boolean success_timer;
+                            Concurrence
+                            {
+                                //LibraryCall timer(Timer=duration, stop_timer=ok, timer_finished=success_timer);
+                                LibraryCall undock(numplanner=numplanner, undockOk=ok);
+                            }
+                        }
+                        elseif(nomaccion == charge)
+                        {
+                            WaitForCharge:
+                            {
+                                Wait duration, 1;
+                            }
+                        }
+                        endif
+
+                        }
+				        ReadBateryLevel:
+				        {
+					        Real percent;
+					        percent=readBateryLevel();
+				        }
+				        CheckActionResult:
+		                {
+		                	StartCondition ExecuteAction.state == FINISHED;
+		                	SkipCondition ExecuteAction.outcome == SKIPPED;
+		                	PostCondition !replanificar;
+			                	//replanificar = ExecuteAction.outcome == FAILURE;
+		                }
+				        SetStartTime:
+				        {
+            				StartCondition replanificar;
+            				SkipCondition !replanificar;
+            				modify_function(numplanner, timeplan, "", timepoint);
+            			}
+                    } // sequence
+        		} // while
+    		} // ExecutePlan
+		} // sequence
+	} // Main planner execution
+} // root

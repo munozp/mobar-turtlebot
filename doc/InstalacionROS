@@ -1,0 +1,39 @@
+sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu trusty main" > /etc/apt/sources.list.d/ros-latest.list'
+wget https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -O - | sudo apt-key add -
+sudo apt-get update
+sudo apt-get install ros-indigo-desktop-full
+sudo rosdep init
+rosdep update
+echo "source /opt/ros/indigo/setup.bash" >> ~/.bashrc
+source ~/.bashrc
+sudo apt-get install python-rosinstall
+ sudo apt-get install ros-indigo-turtlebot ros-indigo-turtlebot-apps ros-indigo-turtlebot-interactions ros-indigo-turtlebot-simulator ros-indigo-kobuki-ftdi
+. /opt/ros/indigo/setup.bash
+rosrun kobuki_ftdi create_udev_rules
+echo "source /opt/ros/indigo/setup.bash" >> ~/.bashrc
+mkdir ~/rocon
+cd ~/rocon
+wstool init -j5 src https://raw.github.com/robotics-in-concert/rocon/indigo/rocon.rosinstall
+source /opt/ros/indigo/setup.bash
+rosdep install --from-paths src -i -y
+catkin_make
+mkdir ~/kobuki
+cd ~/kobuki
+wstool init src -j5 https://raw.github.com/yujinrobot/yujin_tools/master/rosinstalls/indigo/kobuki.rosinstall
+source ~/rocon/devel/setup.bash
+rosdep install --from-paths src -i -y
+catkin_make
+mkdir ~/turtlebot
+cd ~/turtlebot
+wstool init src -j5 https://raw.github.com/yujinrobot/yujin_tools/master/rosinstalls/indigo/turtlebot.rosinstall
+source ~/kobuki/devel/setup.bash
+rosdep install --from-paths src -i -y
+catkin_make
+ sudo apt-get install ant
+sudo apt-get install doxygen
+sudo apt-get install default-jre
+sudo apt-get install default-jdk
+sudo apt-get install python-software-properties
+sudo add-apt-repository ppa:webupd8team/java
+sudo apt-get update
+

@@ -1,0 +1,2 @@
+g++ -I$OPENROBOTS/include/openprs nodo_comunicacion_clnt.c nodo_comunicacion_xdr.c main.cpp -L$OPENROBOTS/lib -lExtMP -o testclient
+

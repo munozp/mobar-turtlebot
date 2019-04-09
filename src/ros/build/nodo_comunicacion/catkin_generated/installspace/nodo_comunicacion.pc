@@ -1,0 +1,8 @@
+prefix=/home/gsi/Escritorio/mobar/src/ros/install
+
+Name: nodo_comunicacion
+Description: Description of nodo_comunicacion
+Version: 0.0.0
+Cflags: 
+Libs: -L/home/gsi/Escritorio/mobar/src/ros/install/lib 
+Requires: 
